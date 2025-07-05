@@ -1,0 +1,24 @@
+{
+    "name": "tailoring-billing-app",
+    "version": "1.0.0",
+    "description": "Desktop billing application for tailoring business",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron . --dev"
+    },
+    "keywords": [
+        "electron",
+        "billing",
+        "tailoring"
+    ],
+    "author": "Your Name",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^27.3.11"
+    },
+    "dependencies": {
+        "jspdf": "^3.0.1",
+        "qrcode": "^1.5.4"
+    }
+}
