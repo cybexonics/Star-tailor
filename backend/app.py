@@ -74,7 +74,7 @@ def handle_preflight_requests():
         return response, 200
 
 # MongoDB connection with SSL fix
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://startailor657_db_user:z9fWtfJ4auOj4KpT@cluster0.sfkrwck.mongodb.net')
+MONGO_URI = os.getenv('MONGO_URI', 'mongodb+srv://star_tailor:fljC9lR6aUPZffka@cluster0.sfkrwck.mongodb.net')
 
 # Initialize collections as None initially
 users_collection = None
