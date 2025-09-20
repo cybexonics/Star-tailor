@@ -19,7 +19,7 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'Aayush@123')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
 # Read frontend URL for CORS from env (default to localhost)
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
