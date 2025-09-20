@@ -28,7 +28,8 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 ALLOWED_ORIGINS = [
     'http://localhost:3000',          # Local development
     'http://127.0.0.1:3000',          # Alternative localhost
-    'https://star-tailor-website.vercel.app'  # Production
+    'https://star-tailor-website.vercel.app',
+    'https://star-tailor.vercel.app'  # Production
 ]
 
 # Add custom frontend URL if different from defaults
