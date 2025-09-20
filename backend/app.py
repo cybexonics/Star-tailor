@@ -41,7 +41,7 @@ print(f"🔧 ALLOWED_ORIGINS: {ALLOWED_ORIGINS}")
 
 # Configure CORS with explicit settings
 CORS(app, 
-     origins=ALLOWED_ORIGINS,
+     origins='*',
      supports_credentials=True,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
      allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
