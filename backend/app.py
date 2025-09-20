@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 
 # Read frontend URL for CORS from env (default to localhost)
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://star-tailor.vercel.app')
 
 # Allow both development and production URLs for CORS
 ALLOWED_ORIGINS = [
