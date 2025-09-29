@@ -1,9 +1,17 @@
-Flask==2.3.3
-Flask-CORS==4.0.0
+# requirements.txt for Vercel Python functions
+
+# Database
 pymongo==4.5.0
+
+# Security / Auth
 bcrypt==4.0.1
 PyJWT==2.8.0
+
+# Environment variables
 python-dotenv==1.0.0
+
+# HTTP requests
 requests==2.31.0
-gunicorn==21.2.0
+
+# Utilities
 cachetools
