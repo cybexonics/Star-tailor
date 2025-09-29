@@ -1,5 +1,4 @@
-import json
-import uuid
+import json, uuid
 
 def handler(request):
     if request["method"] == "OPTIONS":
@@ -7,7 +6,7 @@ def handler(request):
             "statusCode": 200,
             "headers": {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type",
             },
             "body": ""
@@ -25,29 +24,7 @@ def handler(request):
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({
-                "message": "Tailor created successfully",
-                "_id": tailor_id,
-                "tailor_id": tailor_id
-            })
+            "body": json.dumps({"message": "Tailor created", "_id": tailor_id})
         }
 
-    if request["method"] == "PUT":
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({"message": "Tailor updated successfully"})
-        }
-
-    if request["method"] == "DELETE":
-        return {
-            "statusCode": 200,
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({"message": "Tailor deleted successfully"})
-        }
-
-    return {
-        "statusCode": 405,
-        "headers": {"Access-Control-Allow-Origin": "*"},
-        "body": json.dumps({"error": "Method not allowed"})
-    }
+    return {"statusCode": 405, "body": "Method Not Allowed"}
