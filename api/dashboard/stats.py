@@ -1,12 +1,23 @@
 import json
 
 def handler(request):
-    # Later you can add real logic (DB queries, etc.)
+    # Handle preflight (CORS check)
+    if request["method"] == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            },
+            "body": ""
+        }
+
     return {
         "statusCode": 200,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",   # ✅ lets frontend call this
+            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type"
         },
