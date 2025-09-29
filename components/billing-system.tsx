@@ -304,8 +304,11 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
 
       console.log("Creating customer with data:", customerData)
 
-      const customerResponse = await api.customers.create(customerData)
-      const customerId = customerResponse._id || customerResponse.customer?._id
+     const customerResponse = await api.customers.create(customerData)
+const customerId =
+  customerResponse._id ||
+  customerResponse.customer?._id ||
+  customerResponse.customer_id  // <-- add this fallback
 
       console.log("Customer created with ID:", customerId)
 
