@@ -1,7 +1,6 @@
 import json, uuid
 
 def handler(request):
-    # Handle preflight (CORS check)
     if request["method"] == "OPTIONS":
         return {
             "statusCode": 200,
@@ -13,9 +12,7 @@ def handler(request):
             "body": ""
         }
 
-    # Generate a fake customer ID for now
     customer_id = str(uuid.uuid4())
-
     return {
         "statusCode": 200,
         "headers": {
