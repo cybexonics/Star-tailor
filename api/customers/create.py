@@ -1,9 +1,19 @@
-import json
-import uuid  # to generate unique customer IDs
+import json, uuid
 
 def handler(request):
-    # In the future, parse request body and save to DB
-    # For now, just generate a fake ID
+    # Handle preflight (CORS check)
+    if request["method"] == "OPTIONS":
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            },
+            "body": ""
+        }
+
+    # Generate a fake customer ID for now
     customer_id = str(uuid.uuid4())
 
     return {
