@@ -7,22 +7,25 @@ def handler(request):
             "statusCode": 200,
             "headers": {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
             },
             "body": ""
         }
 
-    # Return mock list of customers
+    # Mock customers list
+    customers = [
+        {"_id": "1", "name": "Akash", "phone": "9999999999"},
+        {"_id": "2", "name": "Test User", "phone": "8888888888"},
+    ]
+
     return {
         "statusCode": 200,
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
-        "body": json.dumps({
-            "customers": []
-        })
+        "body": json.dumps({"customers": customers})
     }
