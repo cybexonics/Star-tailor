@@ -159,7 +159,8 @@ export function BillingSystem() {
     try {
       setCustomersLoading(true)
       const response = await api.customers.getAll()
-      setCustomers(response.customers || [])
+      const list = Array.isArray(response) ? response : (response?.customers ?? [])
+      setCustomers(list)
     } catch (error) {
       console.error("Error loading customers:", error)
       toast({
@@ -175,23 +176,23 @@ export function BillingSystem() {
   const loadUpiSettings = async () => {
     try {
       const settings = await api.settings.getUpi()
-      const value = settings.upi_id || settings.upiId
+      const value = settings?.upi_id ?? settings?.upiId
       if (value) {
-        setUpiId(value)
+        setUpiId(String(value))
       }
     } catch (error) {
-      const savedUpiId = localStorage.getItem("adminUpiId")
-      if (savedUpiId) {
-        setUpiId(savedUpiId)
-      }
+      try {
+        const savedUpiId = typeof window !== "undefined" ? localStorage.getItem("adminUpiId") : null
+        if (savedUpiId) setUpiId(savedUpiId)
+      } catch {}
     }
   }
 
   const loadBusinessInfo = async () => {
     try {
       const res = await api.settings.getBusiness()
-      if (res.business_name) setBusinessName(res.business_name)
-      if (res.address) setBusinessAddress(res.address)
+      if (res?.business_name) setBusinessName(String(res.business_name))
+      if (res?.address) setBusinessAddress(String(res.address))
     } catch (e) {
       // ignore, keep defaults
     }
@@ -216,7 +217,9 @@ export function BillingSystem() {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value }
           if (field === "quantity" || field === "rate") {
-            updatedItem.total = updatedItem.quantity * updatedItem.rate
+            const q = Number(updatedItem.quantity) || 0
+            const r = Number(updatedItem.rate) || 0
+            updatedItem.total = q * r
           }
           return updatedItem
         }
@@ -231,44 +234,44 @@ export function BillingSystem() {
     }
   }
 
-const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = event.target.files
-  if (!files || files.length === 0) return
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
 
-  // Convert to persistent base64 data URLs so they render in Workflow after reload
-  const toDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve((reader.result as string) || "")
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
+    // Convert to persistent base64 data URLs so they render in Workflow after reload
+    const toDataUrl = (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string) || "")
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
 
-  const dataUrls: string[] = []
-  for (const f of Array.from(files)) {
-    try {
-      const url = await toDataUrl(f)
-      dataUrls.push(url)
-    } catch (e) {
-      console.error("Failed to read image", e)
+    const dataUrls: string[] = []
+    for (const f of Array.from(files)) {
+      try {
+        const url = await toDataUrl(f)
+        dataUrls.push(url)
+      } catch (e) {
+        console.error("Failed to read image", e)
+      }
+    }
+    if (dataUrls.length > 0) {
+      setDesignImages((prev) => [...prev, ...dataUrls])
     }
   }
-  if (dataUrls.length > 0) {
-    setDesignImages((prev) => [...prev, ...dataUrls])
-  }
-}
 
   const calculateSubtotal = () => {
-    return billItems.reduce((sum, item) => sum + item.total, 0)
+    return billItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
   }
 
   const calculateTotal = () => {
     const subtotal = calculateSubtotal()
-    return subtotal - discount
+    return subtotal - (Number(discount) || 0)
   }
 
   const calculateBalance = () => {
-    return calculateTotal() - advance
+    return calculateTotal() - (Number(advance) || 0)
   }
 
   const generateBill = async () => {
@@ -297,18 +300,19 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
       const customerData = {
         name: newCustomer.name.trim(),
         phone: newCustomer.phone.trim(),
-        email: newCustomer.email.trim(),
-        address: newCustomer.address.trim(),
-        notes: newCustomer.notes.trim(),
+        email: (newCustomer.email || "").trim(),
+        address: (newCustomer.address || "").trim(),
+        notes: (newCustomer.notes || "").trim(),
       }
 
       console.log("Creating customer with data:", customerData)
 
-     const customerResponse = await api.customers.create(customerData)
-const customerId =
-  customerResponse._id ||
-  customerResponse.customer?._id ||
-  customerResponse.customer_id  // <-- add this fallback
+      const customerResponse = await api.customers.create(customerData)
+      const customerId =
+        customerResponse?._id ||
+        customerResponse?.customer?._id ||
+        customerResponse?.customer_id || // fallback for python handler
+        customerResponse?.id
 
       console.log("Customer created with ID:", customerId)
 
@@ -346,12 +350,14 @@ const customerId =
       console.log("Creating bill with data:", billData)
 
       const billResponse = await api.bills.create(billData)
-
-      const created = billResponse.bill || billResponse
-      const billNoStr = created?.bill_no_str || created?.billNoStr || (created?.bill_no != null ? String(created.bill_no).padStart(3, "0") : undefined)
+      const created = billResponse?.bill || billResponse
+      const billNoStr =
+        created?.bill_no_str ||
+        created?.billNoStr ||
+        (created?.bill_no != null ? String(created.bill_no).padStart(3, "0") : undefined)
 
       const bill: Bill = {
-        _id: created?._id || billResponse._id,
+        _id: created?._id || billResponse?._id,
         billNoStr: billNoStr,
         customerId: customerId,
         customerName: newCustomer.name,
@@ -359,9 +365,9 @@ const customerId =
         customerAddress: newCustomer.address,
         items: billItems,
         subtotal: calculateSubtotal(),
-        discount,
+        discount: Number(discount) || 0,
         total: calculateTotal(),
-        advance,
+        advance: Number(advance) || 0,
         balance: calculateBalance(),
         dueDate,
         specialInstructions,
@@ -386,7 +392,7 @@ const customerId =
       console.error("Error generating bill:", error)
       toast({
         title: "Error",
-        description: error.message || "Failed to generate bill. Please try again.",
+        description: error?.message || "Failed to generate bill. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -1000,200 +1006,200 @@ const customerId =
               <AccordionItem value="design-images">
                 <AccordionTrigger className="text-violet-900">Design Images</AccordionTrigger>
                 <AccordionContent>
-            <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
+                  <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
                     <CardContent className="p-4">
                       <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="images">Upload Images</Label>
-                    <Input
-                      id="images"
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="cursor-pointer"
-                    />
-                  </div>
-                  {designImages.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {designImages.map((image, index) => (
-                        <div key={index} className="relative">
-                          <img
-                            src={image || "/placeholder.svg"}
-                            alt={`Design ${index + 1}`}
-                            className="w-full h-24 object-cover rounded border border-violet-100"
-                          />
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-1 right-1 h-6 w-6 p-0"
-                            onClick={() => setDesignImages(designImages.filter((_, i) => i !== index))}
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="design-drawing">
-                <AccordionTrigger className="text-violet-900">Design Drawing</AccordionTrigger>
-                <AccordionContent>
-            <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                  {!isDrawingMode ? (
-                          <div className="flex flex-col gap-3">
-                      <Button
-                        onClick={() => setIsDrawingMode(true)}
-                        variant="outline"
-                        className="border-violet-200 hover:bg-violet-50"
-                      >
-                        <Pen className="h-4 w-4 mr-2" />
-                        Start Drawing
-                      </Button>
-                      {drawings.length > 0 && (
                         <div>
-                          <h4 className="font-medium text-violet-900 mb-2">Saved Drawings</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {drawings.map((drawing, index) => (
+                          <Label htmlFor="images">Upload Images</Label>
+                          <Input
+                            id="images"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="cursor-pointer"
+                          />
+                        </div>
+                        {designImages.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {designImages.map((image, index) => (
                               <div key={index} className="relative">
                                 <img
-                                  src={drawing || "/placeholder.svg"}
-                                  alt={`Drawing ${index + 1}`}
-                                  className="w-full h-24 object-contain rounded border border-violet-100 bg-white"
+                                  src={image || "/placeholder.svg"}
+                                  alt={`Design ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded border border-violet-100"
                                 />
                                 <Button
                                   variant="destructive"
                                   size="sm"
                                   className="absolute top-1 right-1 h-6 w-6 p-0"
-                                  onClick={() => setDrawings(drawings.filter((_, i) => i !== index))}
+                                  onClick={() => setDesignImages(designImages.filter((_, i) => i !== index))}
                                 >
                                   ×
                                 </Button>
                               </div>
                             ))}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="design-drawing">
+                <AccordionTrigger className="text-violet-900">Design Drawing</AccordionTrigger>
+                <AccordionContent>
+                  <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        {!isDrawingMode ? (
+                          <div className="flex flex-col gap-3">
+                            <Button
+                              onClick={() => setIsDrawingMode(true)}
+                              variant="outline"
+                              className="border-violet-200 hover:bg-violet-50"
+                            >
+                              <Pen className="h-4 w-4 mr-2" />
+                              Start Drawing
+                            </Button>
+                            {drawings.length > 0 && (
+                              <div>
+                                <h4 className="font-medium text-violet-900 mb-2">Saved Drawings</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  {drawings.map((drawing, index) => (
+                                    <div key={index} className="relative">
+                                      <img
+                                        src={drawing || "/placeholder.svg"}
+                                        alt={`Drawing ${index + 1}`}
+                                        className="w-full h-24 object-contain rounded border border-violet-100 bg-white"
+                                      />
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        className="absolute top-1 right-1 h-6 w-6 p-0"
+                                        onClick={() => setDrawings(drawings.filter((_, i) => i !== index))}
+                                      >
+                                        ×
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
                           <div className="space-y-3">
-                      <div className="flex gap-2 items-center">
-                        <Label htmlFor="drawingColor">Color:</Label>
+                            <div className="flex gap-2 items-center">
+                              <Label htmlFor="drawingColor">Color:</Label>
                               <Input id="drawingColor" type="color" value={drawingColor} onChange={(e) => setDrawingColor(e.target.value)} className="w-10 h-10 p-1" />
                               <Label htmlFor="drawingWidth" className="ml-2">Width:</Label>
                               <Select value={drawingWidth.toString()} onValueChange={(value) => setDrawingWidth(Number.parseInt(value))}>
                                 <SelectTrigger className="w-20"><SelectValue placeholder="Width" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">Thin</SelectItem>
-                            <SelectItem value="2">Medium</SelectItem>
-                            <SelectItem value="4">Thick</SelectItem>
-                            <SelectItem value="6">Extra Thick</SelectItem>
-                          </SelectContent>
-                        </Select>
+                                <SelectContent>
+                                  <SelectItem value="1">Thin</SelectItem>
+                                  <SelectItem value="2">Medium</SelectItem>
+                                  <SelectItem value="4">Thick</SelectItem>
+                                  <SelectItem value="6">Extra Thick</SelectItem>
+                                </SelectContent>
+                              </Select>
                               <Button variant="outline" onClick={() => clearCanvas(drawingCanvasRef)} className="ml-auto border-red-200 hover:bg-red-50">
-                          <Eraser className="h-4 w-4 mr-2" />
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="border rounded-lg p-2 bg-white">
-                        <canvas
-                          ref={drawingCanvasRef}
-                          width={500}
+                                <Eraser className="h-4 w-4 mr-2" />
+                                Clear
+                              </Button>
+                            </div>
+                            <div className="border rounded-lg p-2 bg-white">
+                              <canvas
+                                ref={drawingCanvasRef}
+                                width={500}
                                 height={240}
-                          className="border rounded bg-white w-full"
-                          onMouseDown={(e) => startDrawing(e, drawingCanvasRef)}
-                          onMouseMove={(e) => draw(e, drawingCanvasRef)}
-                          onMouseUp={stopDrawing}
-                          onMouseLeave={stopDrawing}
-                          onTouchStart={(e) => startDrawingTouch(e, drawingCanvasRef)}
-                          onTouchMove={(e) => drawTouch(e, drawingCanvasRef)}
-                          onTouchEnd={stopDrawing}
-                        />
-                      </div>
-                      <div className="flex gap-2 justify-end">
+                                className="border rounded bg-white w-full"
+                                onMouseDown={(e) => startDrawing(e, drawingCanvasRef)}
+                                onMouseMove={(e) => draw(e, drawingCanvasRef)}
+                                onMouseUp={stopDrawing}
+                                onMouseLeave={stopDrawing}
+                                onTouchStart={(e) => startDrawingTouch(e, drawingCanvasRef)}
+                                onTouchMove={(e) => drawTouch(e, drawingCanvasRef)}
+                                onTouchEnd={stopDrawing}
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end">
                               <Button variant="outline" onClick={() => setIsDrawingMode(false)}>Cancel</Button>
                               <Button onClick={saveDrawing} className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">Save Drawing</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="signature">
                 <AccordionTrigger className="text-violet-900">Customer Signature</AccordionTrigger>
                 <AccordionContent>
-            <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
+                  <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
                     <CardContent className="p-4">
                       <div className="space-y-3">
-                  {!isSignatureMode ? (
+                        {!isSignatureMode ? (
                           <div className="flex flex-col gap-3">
                             <Button onClick={() => setIsSignatureMode(true)} variant="outline" className="border-violet-200 hover:bg-violet-50">
                               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                        Add Signature
-                      </Button>
-                      {signature && (
-                        <div>
-                          <h4 className="font-medium text-violet-900 mb-2">Customer Signature</h4>
-                          <div className="relative inline-block">
+                              Add Signature
+                            </Button>
+                            {signature && (
+                              <div>
+                                <h4 className="font-medium text-violet-900 mb-2">Customer Signature</h4>
+                                <div className="relative inline-block">
                                   <img src={signature || "/placeholder.svg"} alt="Customer Signature" className="w-48 h-24 object-contain rounded border border-violet-100 bg-white" />
                                   <Button variant="destructive" size="sm" className="absolute top-1 right-1 h-6 w-6 p-0" onClick={() => setSignature("")}>×</Button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
+                        ) : (
                           <div className="space-y-3">
-                      <div className="flex justify-end">
+                            <div className="flex justify-end">
                               <Button variant="outline" onClick={() => clearCanvas(signatureCanvasRef)} className="border-red-200 hover:bg-red-50">
-                          <Eraser className="h-4 w-4 mr-2" />
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="border rounded-lg p-2 bg-white">
-                        <canvas
-                          ref={signatureCanvasRef}
-                          width={500}
+                                <Eraser className="h-4 w-4 mr-2" />
+                                Clear
+                              </Button>
+                            </div>
+                            <div className="border rounded-lg p-2 bg-white">
+                              <canvas
+                                ref={signatureCanvasRef}
+                                width={500}
                                 height={160}
-                          className="border rounded bg-white w-full"
-                          onMouseDown={(e) => startDrawing(e, signatureCanvasRef)}
-                          onMouseMove={(e) => draw(e, signatureCanvasRef)}
-                          onMouseUp={stopDrawing}
-                          onMouseLeave={stopDrawing}
-                          onTouchStart={(e) => startDrawingTouch(e, signatureCanvasRef)}
-                          onTouchMove={(e) => drawTouch(e, signatureCanvasRef)}
-                          onTouchEnd={stopDrawing}
-                        />
-                      </div>
-                      <div className="flex gap-2 justify-end">
+                                className="border rounded bg-white w-full"
+                                onMouseDown={(e) => startDrawing(e, signatureCanvasRef)}
+                                onMouseMove={(e) => draw(e, signatureCanvasRef)}
+                                onMouseUp={stopDrawing}
+                                onMouseLeave={stopDrawing}
+                                onTouchStart={(e) => startDrawingTouch(e, signatureCanvasRef)}
+                                onTouchMove={(e) => drawTouch(e, signatureCanvasRef)}
+                                onTouchEnd={stopDrawing}
+                              />
+                            </div>
+                            <div className="flex gap-2 justify-end">
                               <Button variant="outline" onClick={() => setIsSignatureMode(false)}>Cancel</Button>
                               <Button onClick={saveSignature} className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">Save Signature</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
                 </AccordionContent>
               </AccordionItem>
 
               <AccordionItem value="instructions">
                 <AccordionTrigger className="text-violet-900">Special Instructions</AccordionTrigger>
                 <AccordionContent>
-            <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
+                  <Card className="bg-white/70 backdrop-blur-sm border-violet-100 shadow-lg">
                     <CardContent className="p-4">
                       <Textarea value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)} placeholder="Enter special instructions for the tailor..." rows={2} />
-              </CardContent>
-            </Card>
+                    </CardContent>
+                  </Card>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -1276,13 +1282,13 @@ const customerId =
 
         {/* Bill Preview Dialog */}
         <Dialog open={showBillPreview} onOpenChange={setShowBillPreview}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Bill Preview</DialogTitle>
-                <DialogDescription>Review and print the bill</DialogDescription>
-              </DialogHeader>
-              {/* Enhanced Print styles for better bill printing */}
-              <style>{`
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Bill Preview</DialogTitle>
+              <DialogDescription>Review and print the bill</DialogDescription>
+            </DialogHeader>
+            {/* Enhanced Print styles for better bill printing */}
+            <style>{`
                 @media print {
                   @page {
                     size: A4;
@@ -1295,27 +1301,27 @@ const customerId =
                     font-size: 12pt;
                   }
                   
-                  .print\:hidden { 
+                  .print\\:hidden { 
                     display: none !important; 
                   }
                   
-                  .print\:block { 
+                  .print\\:block { 
                     display: block !important; 
                   }
                   
-                  .print\:mt-0 { 
+                  .print\\:mt-0 { 
                     margin-top: 0 !important; 
                   }
                   
-                  .print\:pt-0 { 
+                  .print\\:pt-0 { 
                     padding-top: 0 !important; 
                   }
                   
-                  .print\:text-black {
+                  .print\\:text-black {
                     color: #000 !important;
                   }
                   
-                  .print\:border-black {
+                  .print\\:border-black {
                     border-color: #000 !important;
                   }
                   
@@ -1372,158 +1378,158 @@ const customerId =
                   }
                 }
               `}</style>
-              {currentBill && (
-                <div className="bill-content print:text-black" id="bill-content">
-                  {/* Two-copy layout */}
-                  <div className="border border-gray-300 print:border-black">
-                    <div className="grid grid-cols-2 divide-x divide-gray-300 print:divide-black">
-                      {/* Tailor Copy (Left) */}
-                      <div className="p-3">
-                        <div className="text-center border-b pb-2 mb-2">
-                          <h2 className="text-xl font-bold">{businessName || "STAR TAILOR"}</h2>
-                          <p className="text-xs">EXCLUSIVE LADIES & CUSTOM TAILOR</p>
-                          <p className="text-xs">{businessAddress}</p>
-                </div>
+            {currentBill && (
+              <div className="bill-content print:text-black" id="bill-content">
+                {/* Two-copy layout */}
+                <div className="border border-gray-300 print:border-black">
+                  <div className="grid grid-cols-2 divide-x divide-gray-300 print:divide-black">
+                    {/* Tailor Copy (Left) */}
+                    <div className="p-3">
+                      <div className="text-center border-b pb-2 mb-2">
+                        <h2 className="text-xl font-bold">{businessName || "STAR TAILOR"}</h2>
+                        <p className="text-xs">EXCLUSIVE LADIES & CUSTOM TAILOR</p>
+                        <p className="text-xs">{businessAddress}</p>
+                      </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-xs mb-2">
-                          <div className="border p-2 text-center">
-                            <div className="font-semibold">{currentBill.billNoStr || currentBill._id}</div>
-                            <div className="text-[10px]">Bill No</div>
-                    </div>
-                          <div className="border p-2 text-center">
-                            <div className="font-semibold">{new Date(currentBill.createdDate).toLocaleDateString()}</div>
-                            <div className="text-[10px]">Date</div>
-                    </div>
-                          <div className="border p-2 text-center">
-                            <div className="font-semibold">{currentBill.items.reduce((s,i)=>s+(Number(i.quantity)||0),0)}</div>
-                            <div className="text-[10px]">Qty</div>
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                        <div className="border p-2 text-center">
+                          <div className="font-semibold">{currentBill.billNoStr || currentBill._id}</div>
+                          <div className="text-[10px]">Bill No</div>
+                        </div>
+                        <div className="border p-2 text-center">
+                          <div className="font-semibold">{new Date(currentBill.createdDate).toLocaleDateString()}</div>
+                          <div className="text-[10px]">Date</div>
+                        </div>
+                        <div className="border p-2 text-center">
+                          <div className="font-semibold">{currentBill.items.reduce((s,i)=>s+(Number(i.quantity)||0),0)}</div>
+                          <div className="text-[10px]">Qty</div>
+                        </div>
+                      </div>
 
-                        <div className="border p-2 text-sm mb-2">{currentBill.customerName}</div>
-                        <div className="border p-2 text-sm mb-3">{ITEM_TYPES.find(t=>t.value===currentBill.items[0]?.itemType)?.label || ""}<span className="text-xs ml-1">Cloth Type</span></div>
+                      <div className="border p-2 text-sm mb-2">{currentBill.customerName}</div>
+                      <div className="border p-2 text-sm mb-3">{ITEM_TYPES.find(t=>t.value===currentBill.items[0]?.itemType)?.label || ""}<span className="text-xs ml-1">Cloth Type</span></div>
 
+                      <div className="border p-2 mb-2">
+                        <div className="font-semibold text-xs mb-1">MEASUREMENTS</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {(["Length","Shoulder","Sleeve","Chest","Waist","Hips","Front Neck","Back Neck"] as string[]).map((k)=>{
+                            const v = currentBill.items[0]?.sizes?.[k]
+                            return (
+                              <div key={k} className="flex justify-between">
+                                <span>{k}:</span>
+                                <span className="font-medium">{v || "-"}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="border p-2 mb-2">
+                        <div className="font-semibold text-xs mb-1">TAILOR NOTES:</div>
+                        <div className="text-xs min-h-[48px]">
+                          {currentBill.specialInstructions || "____________________________\n____________________________"}
+                        </div>
+                      </div>
+
+                      {currentBill.designImages.length > 0 && (
                         <div className="border p-2 mb-2">
-                          <div className="font-semibold text-xs mb-1">MEASUREMENTS</div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            {(["Length","Shoulder","Sleeve","Chest","Waist","Hips","Front Neck","Back Neck"] as string[]).map((k)=>{
-                              const v = currentBill.items[0]?.sizes?.[k]
-                              return (
-                                <div key={k} className="flex justify-between">
-                                  <span>{k}:</span>
-                                  <span className="font-medium">{v || "-"}</span>
-                    </div>
-                              )
-                            })}
-                    </div>
-                    </div>
-
-                        <div className="border p-2 mb-2">
-                          <div className="font-semibold text-xs mb-1">TAILOR NOTES:</div>
-                          <div className="text-xs min-h-[48px]">
-                            {currentBill.specialInstructions || "____________________________\n____________________________"}
-                  </div>
-                </div>
-
-                        {currentBill.designImages.length > 0 && (
-                          <div className="border p-2 mb-2">
-                            <div className="font-semibold text-xs mb-1">DESIGN IMAGES</div>
-                            <div className="grid grid-cols-3 gap-2">
-                              {currentBill.designImages.slice(0,3).map((img,idx)=> (
-                                <img key={idx} src={img || "/placeholder.svg"} alt={`Design ${idx+1}`} className="h-20 object-contain border" />
-                              ))}
-                            </div>
+                          <div className="font-semibold text-xs mb-1">DESIGN IMAGES</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {currentBill.designImages.slice(0,3).map((img,idx)=> (
+                              <img key={idx} src={img || "/placeholder.svg"} alt={`Design ${idx+1}`} className="h-20 object-contain border" />
+                            ))}
                           </div>
-                        )}
-
-                        <div className="text-center text-[10px] mt-2">
-                          TAILOR MANAGEMENT COPY
                         </div>
+                      )}
+
+                      <div className="text-center text-[10px] mt-2">
+                        TAILOR MANAGEMENT COPY
+                      </div>
+                    </div>
+
+                    {/* Customer Copy (Right) */}
+                    <div className="p-3">
+                      <div className="text-center border-b pb-2 mb-2">
+                        <h2 className="text-xl font-bold">{businessName || "STAR TAILOR"}</h2>
+                        <p className="text-xs">EXCLUSIVE LADIES & CUSTOM TAILOR</p>
+                        <p className="text-xs">{businessAddress}</p>
+                        <div className="mt-1 text-right text-xs">CASH MEMO<br/>Bill No - <span className="font-semibold">{currentBill.billNoStr || currentBill._id}</span></div>
                       </div>
 
-                      {/* Customer Copy (Right) */}
-                      <div className="p-3">
-                        <div className="text-center border-b pb-2 mb-2">
-                          <h2 className="text-xl font-bold">{businessName || "STAR TAILOR"}</h2>
-                          <p className="text-xs">EXCLUSIVE LADIES & CUSTOM TAILOR</p>
-                          <p className="text-xs">{businessAddress}</p>
-                          <div className="mt-1 text-right text-xs">CASH MEMO<br/>Bill No - <span className="font-semibold">{currentBill.billNoStr || currentBill._id}</span></div>
+                      <div className="text-xs border p-2 mb-2">Name - {currentBill.customerName}</div>
+
+                      <table className="w-full border text-xs mb-2">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border p-1">Sr.No.</th>
+                            <th className="border p-1 text-left">Description</th>
+                            <th className="border p-1">Qty</th>
+                            <th className="border p-1">Rate</th>
+                            <th className="border p-1">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentBill.items.map((item,idx)=> (
+                            <tr key={idx}>
+                              <td className="border p-1 text-center">{idx+1}</td>
+                              <td className="border p-1">{item.description || ITEM_TYPES.find(t=>t.value===item.itemType)?.label}</td>
+                              <td className="border p-1 text-center">{item.quantity}</td>
+                              <td className="border p-1 text-right">₹{item.rate.toFixed(0)}</td>
+                              <td className="border p-1 text-right">₹{item.total.toFixed(0)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <div className="text-xs mb-2 space-y-1 w-52 ml-auto">
+                        <div className="flex justify-between"><span>Total:</span><span className="font-semibold">₹{currentBill.total.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Advance:</span><span className="text-green-700 font-semibold">₹{currentBill.advance.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Balance:</span><span className="text-red-700 font-bold">₹{currentBill.balance.toFixed(2)}</span></div>
+                      </div>
+
+                      {currentBill.designImages.length > 0 && (
+                        <div className="border p-2 mb-2">
+                          <div className="font-semibold text-xs mb-1">DESIGN IMAGES</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {currentBill.designImages.slice(0,3).map((img,idx)=> (
+                              <img key={idx} src={img || "/placeholder.svg"} alt={`Design ${idx+1}`} className="h-20 object-contain border" />
+                            ))}
+                          </div>
                         </div>
+                      )}
 
-                        <div className="text-xs border p-2 mb-2">Name - {currentBill.customerName}</div>
+                      {currentBill.balance > 0 && (
+                        <div className="border p-3 mb-2">
+                          <div className="text-center text-xs mb-2">Scan to Pay Balance Amount</div>
+                          <div className="flex items-center justify-center">
+                            <img src={generateQRCode(currentBill.balance) || "/placeholder.svg"} alt="Payment QR Code" className="w-28 h-28 border" />
+                          </div>
+                          <div className="text-center text-xs mt-2">
+                            <div className="font-semibold">UPI Payment</div>
+                            <div>₹{currentBill.balance.toFixed(2)}</div>
+                            <div>UPI: {upiId}</div>
+                            <div>Order #{currentBill.billNoStr || currentBill._id}</div>
+                          </div>
+                        </div>
+                      )}
 
-                        <table className="w-full border text-xs mb-2">
-                    <thead>
-                            <tr className="bg-gray-100">
-                              <th className="border p-1">Sr.No.</th>
-                              <th className="border p-1 text-left">Description</th>
-                              <th className="border p-1">Qty</th>
-                              <th className="border p-1">Rate</th>
-                              <th className="border p-1">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                            {currentBill.items.map((item,idx)=> (
-                              <tr key={idx}>
-                                <td className="border p-1 text-center">{idx+1}</td>
-                                <td className="border p-1">{item.description || ITEM_TYPES.find(t=>t.value===item.itemType)?.label}</td>
-                                <td className="border p-1 text-center">{item.quantity}</td>
-                                <td className="border p-1 text-right">₹{item.rate.toFixed(0)}</td>
-                                <td className="border p-1 text-right">₹{item.total.toFixed(0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                        <div className="text-xs mb-2 space-y-1 w-52 ml-auto">
-                          <div className="flex justify-between"><span>Total:</span><span className="font-semibold">₹{currentBill.total.toFixed(2)}</span></div>
-                          <div className="flex justify-between"><span>Advance:</span><span className="text-green-700 font-semibold">₹{currentBill.advance.toFixed(2)}</span></div>
-                          <div className="flex justify-between"><span>Balance:</span><span className="text-red-700 font-bold">₹{currentBill.balance.toFixed(2)}</span></div>
+                      <div className="text-center text-[10px] mt-2">
+                        CUSTOMER COPY
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center text-[10px] text-gray-500 border-t py-1">CUT ALONG THIS LINE</div>
                 </div>
 
-                {currentBill.designImages.length > 0 && (
-                          <div className="border p-2 mb-2">
-                            <div className="font-semibold text-xs mb-1">DESIGN IMAGES</div>
-                            <div className="grid grid-cols-3 gap-2">
-                              {currentBill.designImages.slice(0,3).map((img,idx)=> (
-                                <img key={idx} src={img || "/placeholder.svg"} alt={`Design ${idx+1}`} className="h-20 object-contain border" />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                        {currentBill.balance > 0 && (
-                          <div className="border p-3 mb-2">
-                            <div className="text-center text-xs mb-2">Scan to Pay Balance Amount</div>
-                            <div className="flex items-center justify-center">
-                              <img src={generateQRCode(currentBill.balance) || "/placeholder.svg"} alt="Payment QR Code" className="w-28 h-28 border" />
-                        </div>
-                            <div className="text-center text-xs mt-2">
-                              <div className="font-semibold">UPI Payment</div>
-                              <div>₹{currentBill.balance.toFixed(2)}</div>
-                              <div>UPI: {upiId}</div>
-                              <div>Order #{currentBill.billNoStr || currentBill._id}</div>
-                    </div>
-                  </div>
-                )}
-
-                        <div className="text-center text-[10px] mt-2">
-                          CUSTOMER COPY
-                  </div>
-                      </div>
-                        </div>
-                    <div className="text-center text-[10px] text-gray-500 border-t py-1">CUT ALONG THIS LINE</div>
-                        </div>
-
-                  {/* Actions (not printed) */}
-                  <div className="flex justify-center space-x-3 mt-3 print:hidden">
-                    <Button onClick={printBill} className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">
+                {/* Actions (not printed) */}
+                <div className="flex justify-center space-x-3 mt-3 print:hidden">
+                  <Button onClick={printBill} className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700">
                     <Printer className="h-4 w-4 mr-2" />
                     Print Bill
                   </Button>
                   <Button variant="outline" onClick={() => { resetForm(); }}>New Bill</Button>
-                    <Button variant="outline" onClick={() => router.push('/admin/workflow')}>Go to Workflow</Button>
-                    <Button variant="outline" onClick={() => setShowBillPreview(false)}>Close</Button>
+                  <Button variant="outline" onClick={() => router.push('/admin/workflow')}>Go to Workflow</Button>
+                  <Button variant="outline" onClick={() => setShowBillPreview(false)}>Close</Button>
                 </div>
               </div>
             )}
