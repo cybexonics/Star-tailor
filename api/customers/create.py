@@ -8,13 +8,13 @@ def handler(request):
             "statusCode": 200,
             "headers": {
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
             },
             "body": ""
         }
 
-    # Generate a fake customer ID for now
+    # Generate fake customer ID for now
     customer_id = str(uuid.uuid4())
 
     return {
@@ -22,12 +22,12 @@ def handler(request):
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
         "body": json.dumps({
             "message": "Customer created successfully",
-            "_id": customer_id,             # ✅ Standard Mongo-style key
-            "customer_id": customer_id      # ✅ Keep old key for compatibility
+            "_id": customer_id,
+            "customer_id": customer_id
         })
     }
