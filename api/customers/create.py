@@ -25,9 +25,9 @@ def handler(request):
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
         },
-        # ✅ Return a real JSON object, not a string
-        "body": {
+        "body": json.dumps({
             "message": "Customer created successfully",
-            "customer_id": customer_id
-        }
+            "_id": customer_id,             # ✅ Standard Mongo-style key
+            "customer_id": customer_id      # ✅ Keep old key for compatibility
+        })
     }
