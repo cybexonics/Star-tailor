@@ -32,6 +32,20 @@ def handler(request):
             })
         }
 
+    if request["method"] == "PUT":
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "body": json.dumps({"message": "Tailor updated successfully"})
+        }
+
+    if request["method"] == "DELETE":
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "body": json.dumps({"message": "Tailor deleted successfully"})
+        }
+
     return {
         "statusCode": 405,
         "headers": {"Access-Control-Allow-Origin": "*"},
